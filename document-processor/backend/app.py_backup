@@ -1,0 +1,48 @@
+import json
+import os
+from flask import Flask, request, jsonify
+from PIL import Image
+import io
+from ai_predict import generate_v2
+
+app = Flask(__name__)
+
+prompt = """
+You are a document entity extraction specialist. 
+Given a document, your task is to extract the text value of entities.
+- Generate null for missing entities.
+"""
+
+def convert_image_to_pdf(image_bytes, image_format):
+    image = Image.open(io.BytesIO(image_bytes))
+    pdf_bytes = io.BytesIO()
+    image.convert('RGB').save(pdf_bytes, format='PDF')
+    return pdf_bytes.getvalue()
+
+@app.route('/process_file', methods=['POST'])
+def process_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    file_extension = file.filename.lower().split('.')[-1]
+
+    if file_extension == 'pdf':
+        document_bytes = file.read()  # Read the PDF file content into memory
+        json_output = generate_v2(document_bytes, mime_type="application/pdf")
+        return jsonify(json.loads(json_output)), 200
+
+    elif file_extension in ['jpg', 'jpeg', 'png']:
+        image_bytes = file.read()  # Read the image file content into memory
+        pdf_bytes = convert_image_to_pdf(image_bytes, file_extension)
+        json_output = generate_v2(prompt,pdf_bytes, mime_type="application/pdf")
+        return jsonify(json.loads(json_output)), 200
+    
+    return jsonify({"error": "Invalid file type"}), 400
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
