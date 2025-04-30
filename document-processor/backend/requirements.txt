@@ -2,3 +2,5 @@ flask==3.0.3
 pillow==10.4.0
 google-genai
 python-dotenv
+pandas
+pandas-gbq
